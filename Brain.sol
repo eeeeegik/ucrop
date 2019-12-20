@@ -1,6 +1,25 @@
 pragma solidity ^0.4.11;
 
-contract Brain {
+contract Ownable {
+
+  address public owner;
+
+  function Ownable() public {
+    owner = msg.sender;
+  }
+
+  modifier onlyOwner() {
+    require(msg.sender == owner);
+    _;
+  }
+
+  function transferOwnership(address newOwner) public onlyOwner {
+    owner = newOwner;
+  }
+
+}
+
+contract Brain is Ownable{
     
     uint256 public tokensAmount = 0;
     uint256 public maxUcropPerCDPValue = 100;
@@ -12,7 +31,7 @@ contract Brain {
     function getContractCount() // useful to know the row count in contracts index
         public
         constant
-        returns(uint contractCount)
+        returns(uint CDPCount)
     {
         return contracts.length;
     }
@@ -44,14 +63,32 @@ contract Brain {
         return c;
     }
     
+    //информация о курсе валюты
+    function broadcastRate(uint _1EtherCost)
+        public
+        onlyOwner
+    {
+        for(uint i=0; i < contracts.length; i++)
+        {
+            CDP existingCDP = CDP(contracts[i]); //обращаемся к каждому адресу существующих CDP
+            existingCDP.getRateInfo(_1EtherCost); //сообщаем им информацию о курсе эфира
+        }
+    }
+    
 }
 
 contract CDP {
     
     uint256 public maxUcropValue;
+    uint256 public lastRateInfo;
 
     constructor (uint256 _maxUcropValue) public {
         maxUcropValue = _maxUcropValue;
+    }
+    
+    //как обеспечить надежность, что функцию вызывает Brain?
+    function getRateInfo(uint _1EtherCost) external {
+        lastRateInfo = _1EtherCost;
     }
 
   
