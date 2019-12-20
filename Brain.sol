@@ -48,7 +48,7 @@ contract Brain is Ownable{
         public
         returns(address newCDP)
     {
-        CDP c = new CDP(_amountToGet, lastEtherRateInfo);
+        CDP c = new CDP(_amountToGet, lastEtherRateInfo, msg.sender);
         contracts.push(c);
         tokensAmount++;
         return c;
@@ -71,15 +71,16 @@ contract Brain is Ownable{
 
 contract CDP is Ownable{
     
-    uint256 public maxUcropValue;
-    uint256 public lastRateInfo;
+    uint256 public maxUcropValue; //максимальное количество токенов, которые можно приобрести
+    uint256 public lastRateInfo; //последняя полученная информация о курсе Эфира
+    address public clientAddress; //адрес покупателя токенов
 
-    constructor (uint256 _maxUcropValue, uint256 _lastRateInfo) public {
+    constructor (uint256 _maxUcropValue, uint256 _lastRateInfo, address _clientAddress) public {
         maxUcropValue = _maxUcropValue;
         lastRateInfo = _lastRateInfo;
+        clientAddress = _clientAddress;
     }
     
-    //как обеспечить надежность, что функцию вызывает Brain?
     function getRateInfo(uint _1EtherCost) 
         external
         onlyOwner
