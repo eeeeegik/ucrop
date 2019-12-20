@@ -75,11 +75,22 @@ contract CDP is Ownable{
     uint256 public lastRateInfo; //последняя полученная информация о курсе Эфира
     address public clientAddress; //адрес покупателя токенов
     bool public canBeClosedOnlyByClient = true; //флаг, что CDP может быть закрыт только покупателем токенов
+    uint256 tokenAmount;
 
     constructor (uint256 _maxUcropValue, uint256 _lastRateInfo, address _clientAddress) public {
         maxUcropValue = _maxUcropValue;
         lastRateInfo = _lastRateInfo;
         clientAddress = _clientAddress;
+        tokenAmount = calcTokenAmount(_lastRateInfo);
+        generateUcropTokens(tokenAmount);
+    }
+    
+    function calcTokenAmount(uint _lastEtherRateInfo)
+    internal 
+    returns (uint256 calculatedTokenAmount)
+    {
+        uint256 a = ( uint(_lastEtherRateInfo) / 2); //двойное крипто-обеспечение 
+        return a; //выдаем токенов в два раза меньше стоимости внесенного эфира
     }
     
     function getRateInfo(uint _1EtherCost) 
@@ -101,6 +112,96 @@ contract CDP is Ownable{
     {
         canBeClosedOnlyByClient = false;
     }
+    
+    function generateUcropTokens(uint _tokenAmount)
+        private
+    {
+        ;
+    }
+    
+    function() payable {
+        UcropToken u = new UcropToken();
+        uint256 weiAmount = msg.value;
+        uint256 tokens = tokenAmount;
+        //??
+        u.mint(msg.sender, tokens); // пробую написать специальную функцию генерации токенов в CDP
+        
+    }
+    
+
 
   
+}
+
+
+contract UcropToken is Ownable{
+    
+    string public constant name = "Ucrop token";
+    string public constant symbol = "ucr";
+    uint32 constant public decimals = 18;
+    //uint rate; 
+    uint256 public totalSupply ;
+    mapping(address=>uint256) public balances;
+    
+    mapping (address => mapping(address => uint)) allowed;
+    
+   
+
+  function mint(address  _to, uint _value) internal {
+    assert(totalSupply + _value >= totalSupply && balances[_to] + _value >= balances[_to]);
+    balances[_to] += _value;
+    totalSupply += _value;
+  }
+
+  function balanceOf(address _owner) public constant returns (uint balance) {
+    return balances[_owner];
+  }
+
+  function transfer(address _to, uint _value) public returns (bool success) {
+    if(balances[msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
+      balances[msg.sender] -= _value;
+      balances[_to] += _value;
+      Transfer(msg.sender, _to, _value);
+      return true;
+    }
+    return false;
+  }
+
+  function transferFrom(address _from, address _to, uint _value) public returns (bool success) {
+    if( allowed[_from][msg.sender] >= _value &&
+    balances[_from] >= _value
+    && balances[_to] + _value >= balances[_to]) {
+      allowed[_from][msg.sender] -= _value;
+      balances[_from] -= _value;
+      balances[_to] += _value;
+      Transfer(_from, _to, _value);
+      return true;
+    }
+    return false;
+  }
+
+  function approve(address _spender, uint _value) public returns (bool success) {
+    allowed[msg.sender][_spender] = _value;
+    Approval(msg.sender, _spender, _value);
+    return true;
+  }
+
+  function allowance(address _owner, address _spender) public constant returns (uint remaining) {
+    return allowed[_owner][_spender];
+  }
+
+  event Transfer(address indexed _from, address indexed _to, uint _value);
+
+  event Approval(address indexed _owner, address indexed _spender, uint _value);
+
+  /*function getTokenAmount(uint256 _value) internal view returns (uint256) {
+    return _value * rate;
+  }*/
+
+  /*function () payable {
+    uint256 weiAmount = msg.value;
+    uint256 tokens = getTokenAmount(weiAmount);
+    mint(msg.sender, tokens);
+  }*/
+
 }
