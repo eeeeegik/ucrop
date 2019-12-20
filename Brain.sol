@@ -9,7 +9,7 @@ contract Ownable {
   }
 
   modifier onlyOwner() {
-    require(msg.sender == owner);
+    require(msg.sender == owner, "Только owner может вызвать эту функцию");
     _;
   }
 
@@ -24,6 +24,7 @@ contract Brain is Ownable{
     uint256 public tokensAmount = 0;
     uint256 public maxUcropPerCDPValue = 100;
     uint256 public maxUcropPerClient = 1000;
+    uint256 public lastEtherRateInfo = 111;
     
     mapping(address=>uint256) public tokensPerClient; //учет количества токенов по каждому клиенту
     address[] public contracts; // index of created contracts
@@ -41,23 +42,13 @@ contract Brain is Ownable{
         require(tokensPerClient[msg.sender] + _amountToGet <= maxUcropPerClient, "Желаемое количество превышает максимально возможное для одного клиента");
         _;
     }
-    
-// initialize deploying of a new contract
-//аргумент - количество токенов, которое пользователь желает взять в кредит из CDP
-// возможно, есть смысл проводить какие-то проверки пользователей в этой функции
-    function getNewCDP(uint256 _amountToGet) 
-        isLimit(_amountToGet)
-        public 
-        returns(address newCDP) 
-    {
-        return createNewCDP(_amountToGet);
-    }
 
-    function createNewCDP(uint256 _maxUcropValue) //deploy a new contract
-        private
-        returns(address newContract)
+    function createNewCDP(uint256 _amountToGet) //deploy a new contract
+        isLimit(_amountToGet)
+        public
+        returns(address newCDP)
     {
-        CDP c = new CDP(_maxUcropValue);
+        CDP c = new CDP(_amountToGet, lastEtherRateInfo);
         contracts.push(c);
         tokensAmount++;
         return c;
@@ -73,21 +64,26 @@ contract Brain is Ownable{
             CDP existingCDP = CDP(contracts[i]); //обращаемся к каждому адресу существующих CDP
             existingCDP.getRateInfo(_1EtherCost); //сообщаем им информацию о курсе эфира
         }
+        lastEtherRateInfo = _1EtherCost;
     }
     
 }
 
-contract CDP {
+contract CDP is Ownable{
     
     uint256 public maxUcropValue;
     uint256 public lastRateInfo;
 
-    constructor (uint256 _maxUcropValue) public {
+    constructor (uint256 _maxUcropValue, uint256 _lastRateInfo) public {
         maxUcropValue = _maxUcropValue;
+        lastRateInfo = _lastRateInfo;
     }
     
     //как обеспечить надежность, что функцию вызывает Brain?
-    function getRateInfo(uint _1EtherCost) external {
+    function getRateInfo(uint _1EtherCost) 
+        external
+        onlyOwner
+    {
         lastRateInfo = _1EtherCost;
     }
 
