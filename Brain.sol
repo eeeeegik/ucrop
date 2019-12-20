@@ -74,6 +74,7 @@ contract CDP is Ownable{
     uint256 public maxUcropValue; //максимальное количество токенов, которые можно приобрести
     uint256 public lastRateInfo; //последняя полученная информация о курсе Эфира
     address public clientAddress; //адрес покупателя токенов
+    bool public canBeClosedOnlyByClient = true; //флаг, что CDP может быть закрыт только покупателем токенов
 
     constructor (uint256 _maxUcropValue, uint256 _lastRateInfo, address _clientAddress) public {
         maxUcropValue = _maxUcropValue;
@@ -86,6 +87,19 @@ contract CDP is Ownable{
         onlyOwner
     {
         lastRateInfo = _1EtherCost;
+        
+        //в случае, если курс Эфира ниже допустимого минимума
+        if(lastRateInfo < 75)
+        {
+            toAuctionOff();
+        }
+    }
+
+    //выставление содержимого CDP на открытый аукцион
+    function toAuctionOff()
+        private
+    {
+        canBeClosedOnlyByClient = false;
     }
 
   
