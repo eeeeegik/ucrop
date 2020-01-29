@@ -49,6 +49,8 @@ contract Brain is Ownable{
         returns(address newCDP)
     {
         CDP c = new CDP(_amountToGet, lastEtherRateInfo, msg.sender);
+        //web3.eth.personal.sign("Hello world", "0x11f4d0A3c12e86B4b5F39B213F7E19D048276DAe", "test password!")
+        //.then(console.log);
         contracts.push(c);
         tokensAmount++;
         return c;
@@ -76,13 +78,16 @@ contract CDP is Ownable{
     address public clientAddress; //адрес покупателя токенов
     bool public canBeClosedOnlyByClient = true; //флаг, что CDP может быть закрыт только покупателем токенов
     uint256 tokenAmount;
+    address tokenAddress;//когда токен будет задеплоен, станет доступен
 
     constructor (uint256 _maxUcropValue, uint256 _lastRateInfo, address _clientAddress) public {
         maxUcropValue = _maxUcropValue;
         lastRateInfo = _lastRateInfo;
         clientAddress = _clientAddress;
         tokenAmount = calcTokenAmount(_lastRateInfo);
-        generateUcropTokens(tokenAmount);
+        
+        //UcropToken ucrop = new UcropToken();
+        //ucrop.createTokens(tokenAmount);
     }
     
     function calcTokenAmount(uint _lastEtherRateInfo)
@@ -113,22 +118,26 @@ contract CDP is Ownable{
         canBeClosedOnlyByClient = false;
     }
     
-    function generateUcropTokens(uint _tokenAmount)
+    /*function generateUcropTokens(uint _tokenAmount)
         private
     {
-        ;
-    }
+        UcropToken u = UcropToken(tokenAddress);
+        u.createTokens(_tokenAmount, owner);
+        
+    }*/
     
     function() payable {
         UcropToken u = new UcropToken();
         uint256 weiAmount = msg.value;
         uint256 tokens = tokenAmount;
         //??
-        u.mint(msg.sender, tokens); // пробую написать специальную функцию генерации токенов в CDP
+        //u.mint(msg.sender, tokens); // пробую написать специальную функцию генерации токенов в CDP
         
     }
     
-
+    /*function killCDP() {
+        selfdestruct(CDP);
+    }*/
 
   
 }
@@ -194,14 +203,26 @@ contract UcropToken is Ownable{
 
   event Approval(address indexed _owner, address indexed _spender, uint _value);
 
-  /*function getTokenAmount(uint256 _value) internal view returns (uint256) {
-    return _value * rate;
+  function getTokenAmount(uint256 _value) internal view returns (uint256) {
+    return _value;
+  }
+
+    /*modifier onlyBrain (address _ownerOfSender) {
+        
+        require(_ownerOfSender != 0 );
+        _;
+    }*/
+
+  /*function createTokens(uint256 _requiredValue)
+  onlyOwner
+  {
+      
   }*/
 
-  /*function () payable {
+  function () payable {
     uint256 weiAmount = msg.value;
     uint256 tokens = getTokenAmount(weiAmount);
     mint(msg.sender, tokens);
-  }*/
+  }
 
 }
