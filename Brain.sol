@@ -25,9 +25,28 @@ contract Brain is Ownable{
     uint256 public maxUcropPerCDPValue = 100;
     uint256 public maxUcropPerClient = 1000;
     uint256 public lastEtherRateInfo = 111;
+
+    address public ucropTokenAddress;
     
     mapping(address=>uint256) public tokensPerClient; //учет количества токенов по каждому клиенту
+    mapping(address=>address) public CDPHolder;  //Это и все, что ниже дешевле хранить в токене?
+    mapping(address=>uint256) public CDPDeposit; //
+    mapping(address=>uint256) public CDPUcropGiven; // до сюда
+    
     address[] public contracts; // index of created contracts
+    
+    function setUcropTokenAddress(address _newUcropTokenAddress)
+    onlyOwner
+    public
+    {
+        ucropTokenAddress = _newUcropTokenAddress;
+    }
+    
+    modifier onlyToken()
+    {
+        require(ucropTokenAddress == msg.sender);
+        _;
+    }
 
     function getContractCount() // useful to know the row count in contracts index
         public
@@ -43,21 +62,57 @@ contract Brain is Ownable{
         _;
     }
 
-    function createNewCDP(uint256 _amountToGet) //deploy a new contract
-        isLimit(_amountToGet)
+    function createNewCDP(uint256 _depositedEther, address _clientAddress, uint256 _givenTokens) //deploy a new contract
+        //isLimit(_amountToGet)
         public
+        onlyOwner
         returns(address newCDP)
     {
-        CDP c = new CDP(_amountToGet, lastEtherRateInfo, msg.sender);
-        //web3.eth.personal.sign("Hello world", "0x11f4d0A3c12e86B4b5F39B213F7E19D048276DAe", "test password!")
-        //.then(console.log);
+        CDP c = new CDP(_depositedEther, lastEtherRateInfo, _clientAddress, _givenTokens);
         contracts.push(c);
-        tokensAmount++;
+        CDPHolder[c] = _clientAddress;
+        CDPDeposit[c] = _depositedEther;
+        CDPUcropGiven[c] = _givenTokens;
+        //c.transferOwnership(_clientAddress);
+        tokensAmount = tokensAmount + _givenTokens;
         return c;
     }
     
+    modifier CDPUcropGivenCheck(address _CDP, uint _value)
+    {
+        require(CDPUcropGiven[_CDP]==_value, "вы должны полностью вернуть то же количество токенов, сколько взяли у данного CDP");
+        
+        _;
+    }
+    
+     modifier CDPHolderCheck(address _CDP, address _client)
+    {
+        require(1==1, "только владелец CDP может закрыть CDP");
+        _;
+    }
+    
+    function startKillingCDP(address _CDP, uint _value, address _client)
+    onlyToken
+    CDPUcropGivenCheck(_CDP, _value)
+    CDPHolderCheck(_CDP, _client)//пустышка. TODO: реализовать логику открытия аукциона
+    returns (bool success)
+    {
+        return true;
+    }
+    
+    function deleteAllCDPInfo(address _CDP) 
+    onlyToken
+    returns (uint)
+    {
+        delete CDPUcropGiven[_CDP];
+        delete CDPHolder[_CDP];
+        uint tmp = CDPDeposit[_CDP];
+        delete CDPDeposit[_CDP];
+        return tmp;
+    }
+    
     //информация о курсе валюты
-    function broadcastRate(uint _1EtherCost)
+    function broadcastRate(uint _1EtherCost, uint32 _UcropEtherRatio)
         public
         onlyOwner
     {
@@ -67,36 +122,39 @@ contract Brain is Ownable{
             existingCDP.getRateInfo(_1EtherCost); //сообщаем им информацию о курсе эфира
         }
         lastEtherRateInfo = _1EtherCost;
+        
+        UcropToken workingToken = UcropToken(ucropTokenAddress);
+        workingToken.setRate(_UcropEtherRatio);  //сообщаем токену информацию о курсе Укропа к Эфиру
     }
+
     
 }
 
 contract CDP is Ownable{
     
-    uint256 public maxUcropValue; //максимальное количество токенов, которые можно приобрести
+    uint256 public EtherDeposited; //количество заблокированного эфира, на этом CDP
     uint256 public lastRateInfo; //последняя полученная информация о курсе Эфира
+    uint256 public UcropGiven;
     address public clientAddress; //адрес покупателя токенов
     bool public canBeClosedOnlyByClient = true; //флаг, что CDP может быть закрыт только покупателем токенов
     uint256 tokenAmount;
     address tokenAddress;//когда токен будет задеплоен, станет доступен
 
-    constructor (uint256 _maxUcropValue, uint256 _lastRateInfo, address _clientAddress) public {
-        maxUcropValue = _maxUcropValue;
+    constructor (uint256 _EtherDeposited, uint256 _lastRateInfo, address _clientAddress, uint _UcropGiven) public {
+        EtherDeposited = _EtherDeposited;
         lastRateInfo = _lastRateInfo;
         clientAddress = _clientAddress;
-        tokenAmount = calcTokenAmount(_lastRateInfo);
-        
-        //UcropToken ucrop = new UcropToken();
-        //ucrop.createTokens(tokenAmount);
+        //tokenAmount = calcTokenAmount(_lastRateInfo);
+        UcropGiven = _UcropGiven;
     }
     
-    function calcTokenAmount(uint _lastEtherRateInfo)
+    /*function calcTokenAmount(uint _lastEtherRateInfo)
     internal 
     returns (uint256 calculatedTokenAmount)
     {
         uint256 a = ( uint(_lastEtherRateInfo) / 2); //двойное крипто-обеспечение 
         return a; //выдаем токенов в два раза меньше стоимости внесенного эфира
-    }
+    }*/
     
     function getRateInfo(uint _1EtherCost) 
         external
@@ -118,26 +176,20 @@ contract CDP is Ownable{
         canBeClosedOnlyByClient = false;
     }
     
-    /*function generateUcropTokens(uint _tokenAmount)
-        private
-    {
-        UcropToken u = UcropToken(tokenAddress);
-        u.createTokens(_tokenAmount, owner);
-        
-    }*/
     
-    function() payable {
-        UcropToken u = new UcropToken();
-        uint256 weiAmount = msg.value;
+    /*function() payable {
+        uint256 UcropAmount = msg.value;
         uint256 tokens = tokenAmount;
         //??
         //u.mint(msg.sender, tokens); // пробую написать специальную функцию генерации токенов в CDP
         
-    }
-    
-    /*function killCDP() {
-        selfdestruct(CDP);
     }*/
+    
+    function killCDP() 
+    onlyOwner
+    {
+        selfdestruct(owner);
+    }
 
   
 }
@@ -148,18 +200,19 @@ contract UcropToken is Ownable{
     string public constant name = "Ucrop token";
     string public constant symbol = "ucr";
     uint32 constant public decimals = 18;
-    //uint rate; 
+    uint32 public rate = 2; 
     uint256 public totalSupply ;
+    address public BrainAddress;
     mapping(address=>uint256) public balances;
-    
     mapping (address => mapping(address => uint)) allowed;
     
-   
-
-  function mint(address  _to, uint _value) internal {
+  function mint(address  _to, uint _value, uint _depositedEther) internal {
     assert(totalSupply + _value >= totalSupply && balances[_to] + _value >= balances[_to]);
     balances[_to] += _value;
     totalSupply += _value;
+    
+    Brain b = Brain(BrainAddress);
+    b.createNewCDP(_depositedEther, _to, _value);  //вызов функции создания CDP в Brain
   }
 
   function balanceOf(address _owner) public constant returns (uint balance) {
@@ -167,14 +220,35 @@ contract UcropToken is Ownable{
   }
 
   function transfer(address _to, uint _value) public returns (bool success) {
-    if(balances[msg.sender] >= _value && balances[_to] + _value >= balances[_to]) {
-      balances[msg.sender] -= _value;
-      balances[_to] += _value;
-      Transfer(msg.sender, _to, _value);
-      return true;
+      if(balances[msg.sender] >= _value && balances[_to] + _value >= balances[_to]) 
+      {
+        balances[msg.sender] -= _value;
+        balances[_to] += _value;
+        Transfer(msg.sender, _to, _value);
+        return true;
+      }
+      return false;
     }
-    return false;
+  
+  function StartClosingCDP(address _CDP, uint _value) 
+  public
+  returns (bool success)
+  {
+    if(balances[msg.sender] >= _value && balances[address(this)] + _value >= balances[address(this)])
+        {
+            Brain b = Brain(BrainAddress);
+            b.startKillingCDP(_CDP, _value, msg.sender);
+            balances[msg.sender] -= _value;
+            balances[address(this)] += _value;
+            Transfer(msg.sender, address(this), _value);
+            
+            uint EtherDeposit = b.deleteAllCDPInfo(_CDP);
+            msg.sender.transfer(EtherDeposit);
+            return true;
+        }
   }
+  
+  
 
   function transferFrom(address _from, address _to, uint _value) public returns (bool success) {
     if( allowed[_from][msg.sender] >= _value &&
@@ -204,25 +278,58 @@ contract UcropToken is Ownable{
   event Approval(address indexed _owner, address indexed _spender, uint _value);
 
   function getTokenAmount(uint256 _value) internal view returns (uint256) {
-    return _value;
+    return _value / rate;
   }
 
-    /*modifier onlyBrain (address _ownerOfSender) {
-        
-        require(_ownerOfSender != 0 );
-        _;
-    }*/
+  function setRate(uint32 _value) public
+  onlyBrain
+  {
+      rate = _value;
+  }
+  
+  modifier onlyBrain()
+  {
+      require(msg.sender == BrainAddress, "только Brain может устанавливать rate");
+      _;
+  }
 
-  /*function createTokens(uint256 _requiredValue)
+  function setBrainAddress(address _newBrainAddress)
   onlyOwner
   {
-      
+      BrainAddress = _newBrainAddress;
+  }
+
+/**
+ * @param _to Token purchaser
+ * @param _returnedUcropAmount Number of tokens was returned
+ * @param _CDPDeposit Number of Ether to be returned
+ */
+  /*function returnEther(address _to, uint _returnedUcropAmount, uint _CDPDeposit)
+  //onlyBrain
+  balancesPositive(_to)
+  equal(_returnedUcropAmount, _CDPDeposit)
+  public
+  {
+      balances[_to] = balances[_to] - _returnedUcropAmount;
+      _to.transfer(_CDPDeposit);
+  }
+  
+  modifier balancesPositive(address _client)
+  {
+      require(balances[_client] > 0);
+      _;
+  }
+  
+  modifier equal(uint _returnedUcropAmount, uint _CDPDeposit)
+  {
+      require(_returnedUcropAmount == _CDPDeposit, "количество возвращаемых Ucrop должно быть равно долгу CDP ");
+      _;
   }*/
 
   function () payable {
     uint256 weiAmount = msg.value;
     uint256 tokens = getTokenAmount(weiAmount);
-    mint(msg.sender, tokens);
+    mint(msg.sender, tokens, weiAmount);
   }
 
 }
