@@ -126,8 +126,6 @@ contract Brain is Ownable{
         UcropToken workingToken = UcropToken(ucropTokenAddress);
         workingToken.setRate(_UcropEtherRatio);  //сообщаем токену информацию о курсе Укропа к Эфиру
     }
-
-    
 }
 
 contract CDP is Ownable{
@@ -148,14 +146,6 @@ contract CDP is Ownable{
         UcropGiven = _UcropGiven;
     }
     
-    /*function calcTokenAmount(uint _lastEtherRateInfo)
-    internal 
-    returns (uint256 calculatedTokenAmount)
-    {
-        uint256 a = ( uint(_lastEtherRateInfo) / 2); //двойное крипто-обеспечение 
-        return a; //выдаем токенов в два раза меньше стоимости внесенного эфира
-    }*/
-    
     function getRateInfo(uint _1EtherCost) 
         external
         onlyOwner
@@ -175,15 +165,6 @@ contract CDP is Ownable{
     {
         canBeClosedOnlyByClient = false;
     }
-    
-    
-    /*function() payable {
-        uint256 UcropAmount = msg.value;
-        uint256 tokens = tokenAmount;
-        //??
-        //u.mint(msg.sender, tokens); // пробую написать специальную функцию генерации токенов в CDP
-        
-    }*/
     
     function killCDP() 
     onlyOwner
@@ -248,8 +229,6 @@ contract UcropToken is Ownable{
         }
     return false;
   }
-  
-  
 
   function transferFrom(address _from, address _to, uint _value) public returns (bool success) {
     if( allowed[_from][msg.sender] >= _value &&
@@ -300,28 +279,6 @@ contract UcropToken is Ownable{
       BrainAddress = _newBrainAddress;
   }
 
-
-  /*function returnEther(address _to, uint _returnedUcropAmount, uint _CDPDeposit)
-  //onlyBrain
-  balancesPositive(_to)
-  equal(_returnedUcropAmount, _CDPDeposit)
-  public
-  {
-      balances[_to] = balances[_to] - _returnedUcropAmount;
-      _to.transfer(_CDPDeposit);
-  }
-  
-  modifier balancesPositive(address _client)
-  {
-      require(balances[_client] > 0);
-      _;
-  }
-  
-  modifier equal(uint _returnedUcropAmount, uint _CDPDeposit)
-  {
-      require(_returnedUcropAmount == _CDPDeposit, "количество возвращаемых Ucrop должно быть равно долгу CDP ");
-      _;
-  }*/
 
   function () payable {
     uint256 weiAmount = msg.value;
