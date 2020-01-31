@@ -65,7 +65,7 @@ contract Brain is Ownable{
     function createNewCDP(uint256 _depositedEther, address _clientAddress, uint256 _givenTokens) //deploy a new contract
         //isLimit(_amountToGet)
         public
-        onlyOwner
+        onlyToken
         returns(address newCDP)
     {
         CDP c = new CDP(_depositedEther, lastEtherRateInfo, _clientAddress, _givenTokens);
@@ -299,11 +299,7 @@ contract UcropToken is Ownable{
       BrainAddress = _newBrainAddress;
   }
 
-/**
- * @param _to Token purchaser
- * @param _returnedUcropAmount Number of tokens was returned
- * @param _CDPDeposit Number of Ether to be returned
- */
+
   /*function returnEther(address _to, uint _returnedUcropAmount, uint _CDPDeposit)
   //onlyBrain
   balancesPositive(_to)
