@@ -95,20 +95,20 @@ contract Brain is Ownable{
     onlyToken
     CDPUcropGivenCheck(_CDP, _value)
     CDPHolderCheck(_CDP, _client)//пустышка. TODO: реализовать логику открытия аукциона
-    returns (bool success)
+    returns (bool successStartKilling)
     {
         return true;
     }
     
     function deleteAllCDPInfo(address _CDP) 
     onlyToken
-    returns (uint)
+    returns (uint DepositValue)
     {
         delete CDPUcropGiven[_CDP];
         delete CDPHolder[_CDP];
-        uint tmp = CDPDeposit[_CDP];
+        DepositValue = CDPDeposit[_CDP];
         delete CDPDeposit[_CDP];
-        return tmp;
+        return DepositValue;
     }
     
     //информация о курсе валюты
@@ -232,9 +232,9 @@ contract UcropToken is Ownable{
   
   function StartClosingCDP(address _CDP, uint _value) 
   public
-  returns (bool success)
+  returns (bool successStartClosingCDP)
   {
-    if(balances[msg.sender] >= _value && balances[address(this)] + _value >= balances[address(this)])
+    if(balances[msg.sender] >= _value /* && balances[address(this)] + _value >= balances[address(this)]*/)
         {
             Brain b = Brain(BrainAddress);
             b.startKillingCDP(_CDP, _value, msg.sender);
@@ -246,6 +246,7 @@ contract UcropToken is Ownable{
             msg.sender.transfer(EtherDeposit);
             return true;
         }
+    return false;
   }
   
   
