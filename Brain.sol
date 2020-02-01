@@ -31,7 +31,8 @@ contract Brain is Ownable{
     mapping(address=>uint256) public tokensPerClient; //учет количества токенов по каждому клиенту
     mapping(address=>address) public CDPHolder;  //Это и все, что ниже дешевле хранить в токене?
     mapping(address=>uint256) public CDPDeposit; //
-    mapping(address=>uint256) public CDPUcropGiven; // до сюда
+    mapping(address=>uint256) public CDPUcropGiven; //
+    //mapping(address=>uint32) public CDPEtherMinCost; // до сюда
     
     address[] public contracts; // index of created contracts
     
@@ -73,6 +74,7 @@ contract Brain is Ownable{
         CDPHolder[c] = _clientAddress;
         CDPDeposit[c] = _depositedEther;
         CDPUcropGiven[c] = _givenTokens;
+        //CDPEtherMinCost[c] = 75;
         //c.transferOwnership(_clientAddress);
         tokensAmount = tokensAmount + _givenTokens;
         return c;
@@ -87,14 +89,14 @@ contract Brain is Ownable{
     
      modifier CDPHolderCheck(address _CDP, address _client)
     {
-        require(1==1, "только владелец CDP может закрыть CDP");
-        _;
+            require(CDPHolder[_CDP]==0 || CDPHolder[_CDP]==_client, "только владелец CDP может закрыть CDP");
+            _;
     }
     
     function startKillingCDP(address _CDP, uint _value, address _client)
     onlyToken
     CDPUcropGivenCheck(_CDP, _value)
-    CDPHolderCheck(_CDP, _client)//пустышка. TODO: реализовать логику открытия аукциона
+    CDPHolderCheck(_CDP, _client)// TODO: реализовать логику открытия аукциона
     returns (bool successStartKilling)
     {
         return true;
@@ -108,6 +110,9 @@ contract Brain is Ownable{
         delete CDPHolder[_CDP];
         DepositValue = CDPDeposit[_CDP];
         delete CDPDeposit[_CDP];
+        //delete contracts[index]; //TODO: корректное удаление индексов и логику просомтра CDP для клиентов
+        CDP cdp = CDP(_CDP);
+        cdp.killCDP();
         return DepositValue;
     }
     
@@ -118,8 +123,15 @@ contract Brain is Ownable{
     {
         for(uint i=0; i < contracts.length; i++)
         {
-            CDP existingCDP = CDP(contracts[i]); //обращаемся к каждому адресу существующих CDP
-            existingCDP.getRateInfo(_1EtherCost); //сообщаем им информацию о курсе эфира
+            if(contracts[i]!=0)
+            {
+                CDP existingCDP = CDP(contracts[i]); //обращаемся к каждому адресу существующих CDP
+                existingCDP.getRateInfo(_1EtherCost); //сообщаем им информацию о курсе эфира
+                if(_1EtherCost<75)
+                {
+                    CDPHolder[contracts[i]]=0;
+                }
+            }
         }
         lastEtherRateInfo = _1EtherCost;
         
@@ -171,8 +183,6 @@ contract CDP is Ownable{
     {
         selfdestruct(owner);
     }
-
-  
 }
 
 
